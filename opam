@@ -1,0 +1,18 @@
+opam-version: "1.2"
+name: "twiopam"
+version: "dev"
+maintainer: "anil@recoil.org"
+authors: [ "Anil Madhavapeddy" ]
+homepage: "https://github.com/avsm/twiopam"
+bug-reports: "https://github.com/avsm/twiopam/issues"
+dev-repo: "https://github.com/avsm/twiopam.git"
+license: "ISC"
+tags: ["org:mirage"]
+build: [make]
+depends: [
+  "cmdliner"
+  "opamfu"
+  "ocamlfind" {build}
+  "ptime"
+]
+available: [ocaml-version >= "4.01.0"]
