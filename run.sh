@@ -17,4 +17,4 @@ if [ -d ${OPAMROOT} ]; then
 else
   opam init -y -k git ${TMPREPO}
 fi
-./twiopam.native -d ${OUTDIR} $* path:${TMPREPO} 
+twiopam -d ${OUTDIR} $* path:${TMPREPO}
