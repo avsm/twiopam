@@ -1,6 +1,18 @@
-module FU = OpamfuCli
-
-open Cmdliner
+(* Copyright (c) 2016 Anil Madhavapeddy <anil@recoil.org>
+ *
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ *
+ *)
 
 let download_package t output_dir nv =
   let open OpamState.Types in
@@ -39,7 +51,7 @@ let find_changelog t output_dir nv =
       OpamFilename.copy ~src:cfile ~dst;
       Some name
     
-let run preds idx repos output_dir =
+let run preds idx repos output_dir duration =
   let open OpamfUniverse in
   let output_dir = OpamFilename.Dir.of_string output_dir in
   let p = of_repositories ~preds idx repos in
@@ -48,9 +60,13 @@ let run preds idx repos output_dir =
   let pkg_compare (_,a) (_,b) = compare a b in
   let pkgs = List.sort pkg_compare (OpamPackage.Map.bindings dates) in
   (* Filter out the last weeks worth of packages *)
-  let month_s = 2592000.0 in
-  let week_s = month_s /. 4.0 in
-  let duration_s = week_s in
+  let duration_s = 
+    match duration with
+    |`Day -> 86400.
+    |`Week -> 86400. *. 7.
+    |`Month -> 86400. *. 31.
+    |`Year -> 86400. *. 365.
+  in
   let current_s = Unix.gettimeofday () in
   let t = OpamState.load_state "source" in
   let summary = Buffer.create 1024 in
@@ -79,10 +95,17 @@ let run preds idx repos output_dir =
   Buffer.output_buffer fout summary;
   close_out fout
 
+open Cmdliner
+
 let cmd =
   let output_dir =
     let doc = "Output directory to store summary and changelogs in" in
     Arg.(value & opt dir "." & info ["d"] ~docv:"OUTPUT_DIR" ~doc)
+  in
+  let duration =
+    let doc = "Duration to go back in time for the report" in
+    let opts = Arg.enum ["day", `Day; "week",`Week; "month",`Month; "year",`Year] in
+    Arg.(value & opt opts `Week & info ["t";"time"] ~docv:"TIMESPAN" ~doc)
   in
   let doc = "this week in OPAM" in
   let man = [
@@ -91,7 +114,8 @@ let cmd =
     `P "Report them via e-mail to <mirageos-devel@lists.xenproject.org>, or \
         on the issue tracker at <https://github.com/avsm/twiopam/issues>";
   ] in
-  Term.(pure run $ FU.pred $ FU.index $ FU.repositories $ output_dir),
+  let module FU = OpamfuCli in
+  Term.(pure run $ FU.pred $ FU.index $ FU.repositories $ output_dir $ duration),
   Term.info "twiopam" ~version:"1.0.0" ~doc ~man
 
 let () =
