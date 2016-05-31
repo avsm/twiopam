@@ -51,7 +51,7 @@ let find_changelog t output_dir nv =
       OpamFilename.copy ~src:cfile ~dst;
       Some name
     
-let run preds idx repos output_dir duration =
+let run preds idx repos output_dir duration opam_base_href =
   let open OpamfUniverse in
   let output_dir = OpamFilename.Dir.of_string output_dir in
   let p = of_repositories ~preds idx repos in
@@ -81,15 +81,19 @@ let run preds idx repos output_dir duration =
       in
       let changes =
         match find_changelog t output_dir pkg with
-        | None -> "No CHANGES file found."
-        | Some file -> Printf.sprintf "Changes: %s" file
+        | None -> "Unknown"
+        | Some file -> Printf.sprintf "<%s>" file
       in
-      Printf.bprintf summary "### %s %s\n\nReleased on: %s\n%s\n%s\n%s\n\n"
-       (OpamPackage.name_to_string pkg) info.version date info.synopsis
-       changes
+      Printf.bprintf summary "### %s %s\n\n* *Released on:* %s\n* *Synopsis*: %s\n* *More Info*: [Source Code](%s) or [OPAM Page](%s)\n* *Changes*: %s\n\n"
+       (OpamPackage.name_to_string pkg)
+       info.version
+       date
+       info.synopsis
        (match info.url with
          | None -> ""
-         | Some u -> OpamFile.URL.url u |> fun (a,_) -> a);
+         | Some u -> OpamFile.URL.url u |> fun (a,_) -> a)
+       (Printf.sprintf "%s/%s" opam_base_href (Uri.to_string info.href))
+       changes
   ) duration_pkgs;
   let fout = OpamFilename.(OP.(output_dir // "README.md") |> OpamFilename.open_out) in
   Buffer.output_buffer fout summary;
@@ -101,6 +105,10 @@ let cmd =
   let output_dir =
     let doc = "Output directory to store summary and changelogs in" in
     Arg.(value & opt dir "." & info ["d"] ~docv:"OUTPUT_DIR" ~doc)
+  in
+  let opam_base_href =
+    let doc = "Base URI to use for the OPAM metadata page links" in
+    Arg.(value & opt string "https://opam.ocaml.org" & info ["base-href"] ~docv:"BASE_HREF" ~doc)
   in
   let duration =
     let doc = "Duration to go back in time for the report" in
@@ -115,7 +123,7 @@ let cmd =
         on the issue tracker at <https://github.com/avsm/twiopam/issues>";
   ] in
   let module FU = OpamfuCli in
-  Term.(pure run $ FU.pred $ FU.index $ FU.repositories $ output_dir $ duration),
+  Term.(pure run $ FU.pred $ FU.index $ FU.repositories $ output_dir $ duration $ opam_base_href),
   Term.info "twiopam" ~version:"1.0.0" ~doc ~man
 
 let () =
