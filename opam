@@ -15,5 +15,6 @@ depends: [
   "ocamlfind" {build}
   "ptime"
   "fmt"
+  "opam-lib" {>="1.2.2"}
 ]
 available: [ocaml-version >= "4.01.0"]
