@@ -7,6 +7,7 @@ let download_package t output_dir nv =
   let dir =
     let dirname = OpamPackage.to_string nv in
     let cache_subdir = OpamFilename.OP.(output_dir / "cache") in
+    OpamFilename.mkdir cache_subdir;
     OpamFilename.OP.(cache_subdir / dirname)
   in
   match OpamProcess.Job.run (OpamAction.download_package t nv) with
