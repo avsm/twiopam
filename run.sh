@@ -14,8 +14,8 @@ fi
 mkdir -p out/cache
 export OPAMROOT=/tmp/.local-opam
 if [ -d ${OPAMROOT} ]; then
-  opam update -q -u -y
+  opam update -u -y
 else
-  opam init -q -y -k git ${TMPREPO}
+  opam init -y -k git ${TMPREPO}
 fi
 twiopam -d ${OUTDIR} $* path:${TMPREPO}
