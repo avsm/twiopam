@@ -48,14 +48,14 @@ let find_changelog t output_dir nv =
     let changes_file = ref None in
     List.iter (fun cfile ->
       let fname = OpamFilename.OP.(dir // cfile) in
-      if OpamFilename.exists fname then
+      if OpamFilename.exists fname && Unix.((stat (OpamFilename.to_string fname)).st_size) > 0 then
         changes_file := Some fname
     ) changes_files;
     match !changes_file with
     | None -> None
     | Some cfile ->
         prerr_endline (OpamFilename.to_string cfile);
-        let name = "CHANGES-" ^ (OpamPackage.name_to_string nv) ^ ".txt" in
+        let name = "changes-" ^ (OpamPackage.name_to_string nv) ^ ".txt" in
         let dst = OpamFilename.OP.(output_dir // name) in
         OpamFilename.copy ~src:cfile ~dst;
         Some name
@@ -92,7 +92,7 @@ let run preds idx repos output_dir duration opam_base_href =
       let changes =
         match find_changelog t output_dir pkg with
         | None -> "Unknown"
-        | Some file -> Printf.sprintf "<%s>" file
+        | Some file -> Printf.sprintf "[%s](#file-changes-%s-txt)" file (OpamPackage.name_to_string pkg)
       in
       Printf.bprintf summary "### %s %s\n\n* *Released on:* %s\n* *Synopsis*: %s\n* *More Info*: [Source Code](%s) or [OPAM Page](%s)\n* *Changes*: %s\n\n"
        (OpamPackage.name_to_string pkg)
