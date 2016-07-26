@@ -14,11 +14,13 @@
  *
  *)
 
+let cache_subdir = "cache"
+
 let download_package t output_dir nv =
   let open OpamState.Types in
   let dir =
     let dirname = OpamPackage.to_string nv in
-    let cache_subdir = OpamFilename.OP.(output_dir / "cache") in
+    let cache_subdir = OpamFilename.OP.(output_dir / cache_subdir) in
     OpamFilename.mkdir cache_subdir;
     OpamFilename.OP.(cache_subdir / dirname)
   in
@@ -26,6 +28,7 @@ let download_package t output_dir nv =
   | `Error () -> OpamGlobals.error_and_exit "Download failed"
   | `Successful s ->
       (try OpamAction.extract_package t s nv with Failure _ -> ());
+      OpamSystem.remove_dir (OpamFilename.Dir.to_string dir);
       OpamFilename.move_dir
         ~src:(OpamPath.Switch.build t.root t.switch nv)
         ~dst:dir;
@@ -34,22 +37,29 @@ let download_package t output_dir nv =
 let changes_files =
  [ "CHANGES.md"; "CHANGES"; "ChangeLog"; "Changes"; "Changelog" ]
 
+let try_finalize f finally =
+  let res = try f () with exn -> finally (); raise exn in
+  finally ();
+  res
+
 let find_changelog t output_dir nv =
   let dir = download_package t output_dir nv in
-  let changes_file = ref None in
-  List.iter (fun cfile ->
-    let fname = OpamFilename.OP.(dir // cfile) in
-    if OpamFilename.exists fname then
-      changes_file := Some fname
-  ) changes_files;
-  match !changes_file with
-  | None -> None
-  | Some cfile ->
-      prerr_endline (OpamFilename.to_string cfile);
-      let name = "CHANGES-" ^ (OpamPackage.name_to_string nv) ^ ".txt" in
-      let dst = OpamFilename.OP.(output_dir // name) in
-      OpamFilename.copy ~src:cfile ~dst;
-      Some name
+  try_finalize (fun () ->
+    let changes_file = ref None in
+    List.iter (fun cfile ->
+      let fname = OpamFilename.OP.(dir // cfile) in
+      if OpamFilename.exists fname then
+        changes_file := Some fname
+    ) changes_files;
+    match !changes_file with
+    | None -> None
+    | Some cfile ->
+        prerr_endline (OpamFilename.to_string cfile);
+        let name = "CHANGES-" ^ (OpamPackage.name_to_string nv) ^ ".txt" in
+        let dst = OpamFilename.OP.(output_dir // name) in
+        OpamFilename.copy ~src:cfile ~dst;
+        Some name
+  ) (fun () -> OpamSystem.remove_dir (OpamFilename.Dir.to_string dir))
     
 let run preds idx repos output_dir duration opam_base_href =
   let open OpamfUniverse in
@@ -97,7 +107,8 @@ let run preds idx repos output_dir duration opam_base_href =
   ) duration_pkgs;
   let fout = OpamFilename.(OP.(output_dir // "README.md") |> OpamFilename.open_out) in
   Buffer.output_buffer fout summary;
-  close_out fout
+  close_out fout;
+  OpamSystem.remove_dir (OpamFilename.(Dir.to_string (OP.(output_dir / cache_subdir))))
 
 open Cmdliner
 
