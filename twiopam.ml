@@ -48,7 +48,8 @@ let find_changelog t output_dir nv =
     let changes_file = ref None in
     List.iter (fun cfile ->
       let fname = OpamFilename.OP.(dir // cfile) in
-      if OpamFilename.exists fname && Unix.((stat (OpamFilename.to_string fname)).st_size) > 0 then
+      if OpamFilename.exists fname &&
+         Unix.((stat (OpamFilename.to_string fname)).st_size) > 0 then
         changes_file := Some fname
     ) changes_files;
     match !changes_file with
@@ -61,13 +62,13 @@ let find_changelog t output_dir nv =
         Some name
   ) (fun () -> OpamSystem.remove_dir (OpamFilename.Dir.to_string dir))
     
-let run preds idx repos output_dir duration opam_base_href =
+let run preds idx repos output_dir duration end_date opam_base_href =
   let open OpamfUniverse in
   let output_dir = OpamFilename.Dir.of_string output_dir in
   let p = of_repositories ~preds idx repos in
   (* let r = index_by_repo p.pkg_idx in *)
   let dates = p.pkgs_dates in
-  let pkg_compare (_,a) (_,b) = compare a b in
+  let pkg_compare (_,b) (_,a) = compare a b in
   let pkgs = List.sort pkg_compare (OpamPackage.Map.bindings dates) in
   (* Filter out the last weeks worth of packages *)
   let duration_s = 
@@ -77,10 +78,13 @@ let run preds idx repos output_dir duration opam_base_href =
     |`Month -> 86400. *. 31.
     |`Year -> 86400. *. 365.
   in
-  let current_s = Unix.gettimeofday () in
+  let current_s = CalendarLib.Date.to_unixfloat end_date in
   let t = OpamState.load_state "source" in
   let summary = Buffer.create 1024 in
-  let duration_pkgs = List.filter (fun (_,d) -> (current_s -. duration_s) < d) pkgs in
+  let duration_pkgs =
+    List.filter (fun (_,d) ->
+     (d < current_s) &&
+     ((current_s -. duration_s) < d)) pkgs in
   List.iter
     (fun (pkg,date) ->
       let info = OpamPackage.Map.find pkg p.pkgs_infos in
@@ -112,19 +116,37 @@ let run preds idx repos output_dir duration opam_base_href =
 
 open Cmdliner
 
+let todays_date = CalendarLib.Date.from_unixfloat (Unix.gettimeofday ())
+
+let date_term : CalendarLib.Printer.Date.t Arg.converter =
+  let parse s =
+    try 
+     let v = match s with
+     |"today" -> todays_date
+     | x -> CalendarLib.Printer.Date.from_fstring "%F" x
+     in `Ok v
+    with exn -> `Error (Printexc.to_string exn)
+  in
+  let print fmt s = CalendarLib.Printer.Date.fprint "%F" fmt s in
+  parse, print
+ 
 let cmd =
   let output_dir =
-    let doc = "Output directory to store summary and changelogs in" in
-    Arg.(value & opt dir "." & info ["d"] ~docv:"OUTPUT_DIR" ~doc)
+    let doc = "Output directory to store summary and changelogs in." in
+    Arg.(value & opt dir "." & info ["o"] ~docv:"OUTPUT_DIR" ~doc)
   in
   let opam_base_href =
-    let doc = "Base URI to use for the OPAM metadata page links" in
+    let doc = "Base URI to use for the OPAM metadata page links." in
     Arg.(value & opt string "https://opam.ocaml.org" & info ["base-href"] ~docv:"BASE_HREF" ~doc)
   in
   let duration =
-    let doc = "Duration to go back in time for the report" in
+    let doc = "Duration to go back in time for the report ($(i,day), $(i,week), $(i,month), $(i,year))" in
     let opts = Arg.enum ["day", `Day; "week",`Week; "month",`Month; "year",`Year] in
     Arg.(value & opt opts `Week & info ["t";"time"] ~docv:"TIMESPAN" ~doc)
+  in
+  let end_date =
+    let doc = "End date for the logger in YYYY-MM-DD format or 'today' for current day." in
+    Arg.(value & opt date_term todays_date & info ["d";"end-date"] ~docv:"START_DATE" ~doc)
   in
   let doc = "this week in OPAM" in
   let man = [
@@ -134,7 +156,7 @@ let cmd =
         on the issue tracker at <https://github.com/avsm/twiopam/issues>";
   ] in
   let module FU = OpamfuCli in
-  Term.(pure run $ FU.pred $ FU.index $ FU.repositories $ output_dir $ duration $ opam_base_href),
+  Term.(pure run $ FU.pred $ FU.index $ FU.repositories $ output_dir $ duration $ end_date $ opam_base_href),
   Term.info "twiopam" ~version:"1.0.0" ~doc ~man
 
 let () =

@@ -16,5 +16,6 @@ depends: [
   "ptime"
   "fmt"
   "opam-lib" {>="1.2.2"}
+  "calendar"
 ]
 available: [ocaml-version >= "4.01.0"]

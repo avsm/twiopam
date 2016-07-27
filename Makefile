@@ -5,7 +5,7 @@ all: twiopam.native
 	@ :
 
 twiopam.native: twiopam.ml
-	ocamlbuild -use-ocamlfind -tag annot,bin_annot,debug,principal -pkgs opam-lib,opamfu.cli,ptime,fmt twiopam.native
+	ocamlbuild -use-ocamlfind -tag annot,bin_annot,debug,principal -pkgs opam-lib,opamfu.cli,ptime,fmt,calendar twiopam.native
 
 run:
 	if [ ! -d $(TMPREPO) ]; then git clone git://github.com/ocaml/opam-repository $(TMPREPO); else git -C $(TMPREPO) pull origin master; fi

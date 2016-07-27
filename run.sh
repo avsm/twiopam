@@ -27,7 +27,7 @@ if [ -d ${OPAMROOT} ]; then
 else
   opam init -y -k git ${TMPREPO}
 fi
-twiopam -d ${OUTDIR} $* path:${TMPREPO}
+twiopam -o ${OUTDIR} $* path:${TMPREPO}
 find ${OUTDIR} -type f -name '*.txt' | while read FFN
 do
     encoding=`uchardet "$FFN" | awk -F/ '{print $1}'`
