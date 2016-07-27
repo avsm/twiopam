@@ -81,6 +81,10 @@ let run preds idx repos output_dir duration end_date opam_base_href =
   let current_s = CalendarLib.Date.to_unixfloat end_date in
   let t = OpamState.load_state "source" in
   let summary = Buffer.create 1024 in
+  Buffer.add_string summary
+   (Printf.sprintf "# This %s in OPAM releases (%s)\n\n"
+     (match duration with |`Day -> "day" |`Week -> "week" |`Month -> "month" |`Year -> "year")
+     (CalendarLib.Printer.Date.sprint "%a %b %d %Y" end_date));
   let duration_pkgs =
     List.filter (fun (_,d) ->
      (d < current_s) &&
@@ -89,24 +93,23 @@ let run preds idx repos output_dir duration end_date opam_base_href =
     (fun (pkg,date) ->
       let info = OpamPackage.Map.find pkg p.pkgs_infos in
       let date =
-        match Ptime.of_float_s date with
-        | None -> failwith "unexpected date"
-        | Some d -> Fmt.strf "%a" Ptime.pp d
+        CalendarLib.Date.from_unixfloat date |>
+        CalendarLib.Printer.Date.sprint "%a %b %d %Y" 
       in
       let changes =
         match find_changelog t output_dir pkg with
         | None -> "Unknown"
         | Some file -> Printf.sprintf "[%s](#file-changes-%s-txt)" file (OpamPackage.name_to_string pkg)
       in
-      Printf.bprintf summary "### %s %s\n\n* *Released on:* %s\n* *Synopsis*: %s\n* *More Info*: [Source Code](%s) or [OPAM Page](%s)\n* *Changes*: %s\n\n"
+      Printf.bprintf summary "### %s %s\n\n* *Released on:* %s\n* *Synopsis*: %s\n* *More Info*: [OPAM Page](%s) or [Source Code](%s)\n* *Changes*: %s\n\n"
        (OpamPackage.name_to_string pkg)
        info.version
        date
        info.synopsis
+       (Printf.sprintf "%s/%s" opam_base_href (Uri.to_string info.href))
        (match info.url with
          | None -> ""
          | Some u -> OpamFile.URL.url u |> fun (a,_) -> a)
-       (Printf.sprintf "%s/%s" opam_base_href (Uri.to_string info.href))
        changes
   ) duration_pkgs;
   let fout = OpamFilename.(OP.(output_dir // "README.md") |> OpamFilename.open_out) in
